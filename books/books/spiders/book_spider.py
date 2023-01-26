@@ -3,7 +3,7 @@ from typing import Generator, Any
 from urllib.parse import urljoin
 
 import scrapy
-from datetime import datetime
+from datetime import datetime, date
 
 from scrapy.crawler import CrawlerProcess
 
@@ -12,9 +12,7 @@ PATH = "search?searchTerm=books&category="
 CATEGORY_URL = urljoin(BASE_URL, PATH)
 
 
-def parse_all_categories(
-    folder_name: str, categories: dict[str, str],
-) -> None:
+def parse_all_categories(folder_name: str, categories: dict[str, str]) -> None:
     """
     The function checks if the folder exists, runs the spider,
     and saves the parsed data to a file.
@@ -97,21 +95,49 @@ class BookSpider(scrapy.Spider):
                 url=url, callback=self.parse, headers=self.HEADERS,
             )
 
-    def parse(self, response: Any, *args: Any, **kwargs: Any) -> Generator:
+    @staticmethod
+    def parse_title(response: Any) -> str:
         """
-        The method is used to extract relevant information from the book
-        pages of the website.
+        The method returns the parsed `title`
+        from the detailed book page.
         """
         title = response.css("h1[itemprop='name']::text").get()
+
+        return title
+
+    @staticmethod
+    def parse_authors(response: Any) -> str:
+        """
+        The method returns the parsed `authors`
+        from the detailed book page.
+        """
         authors = ", ".join(
             full_name.strip()
             for full_name in response.css(
                 ".author-info > span[itemprop='author'] > a > span[itemprop='name']::text"
             ).getall()
         )
+
+        return authors
+
+    @staticmethod
+    def parse_rating(response: Any) -> str:
+        """
+        The method returns the parsed `rating`
+        from the detailed book page.
+        """
         rating = (
             response.css("span[itemprop='ratingValue']::text").get().strip()
         )
+
+        return rating
+
+    @staticmethod
+    def parse_rating_details(response: Any) -> list[str]:
+        """
+        The method returns the parsed `rating_details`
+        from the detailed book page.
+        """
         rating_details = [
             rating.strip().split(" (")[-1].strip(")").replace(",", "")
             for rating in response.css(
@@ -119,6 +145,15 @@ class BookSpider(scrapy.Spider):
             ).getall()
             if "%" in rating
         ]
+
+        return rating_details
+
+    @staticmethod
+    def parse_number_of_votes_goodreads(response: Any) -> str:
+        """
+        The method returns the parsed `number_of_votes_goodreads`
+        from the detailed book page.
+        """
         number_of_votes_goodreads = (
             response.css(".rating-count::text")
             .get()
@@ -126,12 +161,30 @@ class BookSpider(scrapy.Spider):
             .split()[0]
             .replace(",", "")
         )
+
+        return number_of_votes_goodreads
+
+    @staticmethod
+    def parse_price_in_euros(response: Any) -> str:
+        """
+        The method returns the parsed `price_in_euros`
+        from the detailed book page.
+        """
         price_in_euros = (
             response.css(".sale-price::text")
             .get()
             .strip(" €")
             .replace(",", ".")
         )
+
+        return price_in_euros
+
+    @staticmethod
+    def parse_discount_in_euros(response: Any) -> str:
+        """
+        The method returns the parsed `discount_in_euros`
+        from the detailed book page.
+        """
         discount_in_euros = (
             response.css(".price-save::text")
             .get()
@@ -139,14 +192,41 @@ class BookSpider(scrapy.Spider):
             .split()[-1]
             .replace(",", ".")
         )
+
+        return 0 or discount_in_euros
+
+    @staticmethod
+    def parse_number_of_pages(response: Any) -> str:
+        """
+        The method returns the parsed `number_of_pages`
+        from the detailed book page.
+        """
         number_of_pages = (
             response.css("span[itemprop='numberOfPages']::text")
             .get()
             .strip(" pages\n")
         )
+
+        return number_of_pages
+
+    @staticmethod
+    def parse_publication_date(response: Any) -> date:
+        """
+        The method returns the parsed `publication_date`
+        from detailed book page.
+        """
         publication_date = response.css(
             "span[itemprop='datePublished']::text"
         ).get()
+
+        return datetime.strptime(publication_date, "%d %b %Y").date()
+
+    @staticmethod
+    def parse_publisher(response: Any) -> str:
+        """
+        The method returns the parsed `publisher`
+        from the detailed book page.
+        """
         publisher = (
             response.css(
                 "span[itemprop='publisher'] > a > span[itemprop='name']::text"
@@ -154,8 +234,35 @@ class BookSpider(scrapy.Spider):
             .get()
             .strip()
         )
+
+        return publisher
+
+    @staticmethod
+    def parse_language(response: Any) -> str:
+        """
+        The method returns the parsed `language`
+        from the detailed book page.
+        """
         language = response.css("span[itemprop='inLanguage'] > a::text").get()
+
+        return language
+
+    @staticmethod
+    def parse_isbn13(response: Any) -> str:
+        """
+        The method returns the parsed `isbn13`
+        from the detailed book page.
+        """
         isbn13 = response.css("span[itemprop='isbn']::text").get()
+
+        return isbn13
+
+    @staticmethod
+    def parse_bestsellers_rank(response: Any) -> str:
+        """
+        The method returns the parsed `bestsellers_rank`
+        from the detailed book page.
+        """
         bestsellers_rank = (
             response.css(".biblio-info > li > span::text")
             .getall()[-1]
@@ -163,27 +270,50 @@ class BookSpider(scrapy.Spider):
             .replace(",", "")
         )
 
+        return bestsellers_rank
+
+    def get_category(self):
+        """
+        The method returns the `category` of the book.
+        """
+        category = self.category.title().replace("_", ", ")
+
+        return category
+
+    def parse(self, response: Any, *args: Any, **kwargs: Any) -> Generator:
+        """
+        The method is used to extract relevant information from the book
+        pages of the website.
+        """
         yield {
-            "title": title,
-            "authors": authors,
-            "number_of_pages": number_of_pages,
-            "publisher": publisher,
-            "publication_date": datetime.strptime(
-                publication_date, "%d %b %Y"
-            ).date(),
-            "price_in_euros": price_in_euros,
-            "discount_in_euros": 0 or discount_in_euros,
-            "rating": rating,
-            "number_of_votes_goodreads": number_of_votes_goodreads,
-            "number_of_votes_one_star": rating_details[4],
-            "number_of_votes_two_stars": rating_details[3],
-            "number_of_votes_three_stars": rating_details[2],
-            "number_of_votes_four_stars": rating_details[1],
-            "number_of_votes_five_stars": rating_details[0],
-            "bestsellers_rank": bestsellers_rank,
-            "isbn13": isbn13,
-            "language": language,
-            "category": self.category.title().replace("_", ", "),
+            "title": self.parse_title(response),
+            "authors": self.parse_authors(response),
+            "number_of_pages": self.parse_number_of_pages(response),
+            "publisher": self.parse_publisher(response),
+            "publication_date": self.parse_publication_date(response),
+            "price_in_euros": self.parse_price_in_euros(response),
+            "discount_in_euros": self.parse_discount_in_euros(response),
+            "rating": self.parse_rating(response),
+            "number_of_votes_goodreads": self.parse_number_of_votes_goodreads(
+                response
+            ),
+            "number_of_votes_one_star": self.parse_rating_details(response)[4],
+            "number_of_votes_two_stars": self.parse_rating_details(response)[
+                3
+            ],
+            "number_of_votes_three_stars": self.parse_rating_details(response)[
+                2
+            ],
+            "number_of_votes_four_stars": self.parse_rating_details(response)[
+                1
+            ],
+            "number_of_votes_five_stars": self.parse_rating_details(response)[
+                0
+            ],
+            "bestsellers_rank": self.parse_bestsellers_rank(response),
+            "isbn13": self.parse_isbn13(response),
+            "language": self.parse_language(response),
+            "category": self.get_category(),
         }
 
 
