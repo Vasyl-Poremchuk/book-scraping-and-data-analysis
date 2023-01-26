@@ -1,10 +1,9 @@
 import os.path
+from datetime import datetime, date
 from typing import Generator, Any
 from urllib.parse import urljoin
 
 import scrapy
-from datetime import datetime, date
-
 from scrapy.crawler import CrawlerProcess
 
 BASE_URL = "https://www.bookdepository.com"
