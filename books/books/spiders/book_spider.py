@@ -10,6 +10,25 @@ from scrapy.crawler import CrawlerProcess
 BASE_URL = "https://www.bookdepository.com"
 PATH = "search?searchTerm=books&category="
 CATEGORY_URL = urljoin(BASE_URL, PATH)
+NUMBER_OF_PAGES = 333
+CONCURRENT_REQUESTS = 64
+CONCURRENT_REQUESTS_PER_DOMAIN = 32
+DOWNLOAD_DELAY = 0.2
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) "
+    "Gecko/20100101 Firefox/98.0",
+    "Accept": "text/html,application/xhtml+xml,"
+    "application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Cache-Control": "max-age=0",
+}
 
 
 def parse_all_categories(folder_name: str, categories: dict[str, str]) -> None:
@@ -38,28 +57,11 @@ def parse_all_categories(folder_name: str, categories: dict[str, str]) -> None:
 class BookSpider(scrapy.Spider):
     name = "bookdepository"
     allowed_domains = ["bookdepository.com"]
-    number_of_pages = 333
-
-    HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) "
-        "Gecko/20100101 Firefox/98.0",
-        "Accept": "text/html,application/xhtml+xml,"
-        "application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
-    }
 
     custom_settings = {
-        "CONCURRENT_REQUESTS": 64,
-        "CONCURRENT_REQUESTS_PER_DOMAIN": 32,
-        "DOWNLOAD_DELAY": 0.2,
+        "CONCURRENT_REQUESTS": CONCURRENT_REQUESTS,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": CONCURRENT_REQUESTS_PER_DOMAIN,
+        "DOWNLOAD_DELAY": DOWNLOAD_DELAY,
     }
 
     def __init__(
@@ -74,11 +76,11 @@ class BookSpider(scrapy.Spider):
         The method is defined as a generator function that yields instances
         of the `scrapy.Request` class, which is used to initiate web requests.
         """
-        for number in range(1, self.number_of_pages + 1):
+        for number in range(1, NUMBER_OF_PAGES + 1):
             url = f"{self.endpoint}&page={str(number)}"
 
             yield scrapy.Request(
-                url=url, callback=self.parse_pages, headers=self.HEADERS,
+                url=url, callback=self.parse_pages, headers=HEADERS
             )
 
     def parse_pages(
@@ -91,9 +93,7 @@ class BookSpider(scrapy.Spider):
         for href in response.css(".title > a::attr(href)").getall():
             url = response.urljoin(href)
 
-            yield scrapy.Request(
-                url=url, callback=self.parse, headers=self.HEADERS,
-            )
+            yield scrapy.Request(url=url, callback=self.parse, headers=HEADERS)
 
     @staticmethod
     def parse_title(response: Any) -> str:
